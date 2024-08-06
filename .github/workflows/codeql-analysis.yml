@@ -1,54 +1,52 @@
-name: "CodeQL Analysis"
+name: "CodeQL"
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
   schedule:
-    - cron: '0 3 * * 1'  # Weekly schedule; adjust as needed
+    - cron: '25 10 * * 1' # Runs at 10:25 AM every Monday
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
 
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'go', 'java', 'javascript', 'csharp', 'python', 'php' ]
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
-      with:
-        languages: ${{ matrix.language }}
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: ./.github/codeql/**/*.sarif
-
-  custom-analysis:
-    name: Custom Security Analysis
-    needs: analyze
-    runs-on: ubuntu-latest
+        language: ['go', 'java', 'javascript', 'csharp', 'python', 'php']
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      # Add custom analysis steps for targeted vulnerabilities
-      # Example for Java: Custom SQL Injection and SSRF analysis
-      - name: Custom Java Analysis for SQL Injection and SSRF
-        run: |
-          echo "Run custom analysis scripts here."
-          # Example script
-          # java -jar custom-analysis-tool.jar --target ./proxy-service/
-          # java -jar custom-analysis-tool.jar --target ./profile-service/
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          output: sarif/findings.sarif
+
+      - name: Add SCW Training
+        uses: SecureCodeWarrior/github-action-add-sarif-contextual-training@v1
+        with:
+          inputSarifFile: sarif/findings.sarif
+          outputSarifFile: sarif/findings.processed.sarif
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Import Results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: sarif/findings.processed.sarif
